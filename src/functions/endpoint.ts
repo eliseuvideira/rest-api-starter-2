@@ -7,43 +7,51 @@ import {
 import { ReadStream } from "fs";
 import { Readable } from "stream";
 
-export type Stream = Readable | ReadStream;
-
 export type RequestHandlerResponse<T> = {
   status: number;
   headers?: Record<string, any>;
-  body: T | Stream;
+  body: T;
 };
 
-export type ExpressRequestMinimal = Omit<
-  ExpressRequest,
-  "params" | "query" | "body"
->;
-
-export interface Request<Params, Query, Body> extends ExpressRequestMinimal {
+export interface EndpointArgs<Params, Query, Body> {
   params: Params;
   query: Query;
   body: Body;
 }
 
-export type RequestHandler<ResBody, ReqParams, ReqQuery, ReqBody> = (
-  req: Request<ReqParams, ReqQuery, ReqBody>,
-  res: ExpressResponse,
-  next: ExpressNextFunction,
-) => Promise<RequestHandlerResponse<ResBody>>;
+export interface EndpointContext {
+  req: ExpressRequest;
+  res: ExpressResponse;
+  next: ExpressNextFunction;
+}
+
+export type RequestHandler<Body, ArgsParams, ArgsQuery, ArgsBody> = (
+  args: EndpointArgs<ArgsParams, ArgsQuery, ArgsBody>,
+  ctx: EndpointContext,
+) => Promise<RequestHandlerResponse<Body>>;
 
 export const endpoint =
   <
-    ResBody,
-    ReqParams = Record<string, string>,
-    ReqQuery = Record<string, string>,
-    ReqBody = Record<string, any>,
+    Body,
+    Args extends Partial<
+      EndpointArgs<ArgsParams, ArgsQuery, ArgsBody>
+    > = Record<string, never>,
+    ArgsParams = Args["params"],
+    ArgsQuery = Args["query"],
+    ArgsBody = Args["body"],
   >(
-    handler: RequestHandler<ResBody, ReqParams, ReqQuery, ReqBody>,
+    handler: RequestHandler<Body, ArgsParams, ArgsQuery, ArgsBody>,
   ): ExpressRequestHandler =>
   async (req, res, next) => {
     try {
-      const values = await handler(req as any, res, next);
+      const values = await handler(
+        {
+          params: (req.params as any) || {},
+          query: (req.query as any) || {},
+          body: req.body || {},
+        },
+        { req, res, next },
+      );
 
       if (values.headers) {
         const keys = Object.keys(values.headers);
