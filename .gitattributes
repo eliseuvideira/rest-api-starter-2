@@ -1,0 +1,2 @@
+.husky/pre-commit linguist-vendored
+.husky/pre-push linguist-vendored
